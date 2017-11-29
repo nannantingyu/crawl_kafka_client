@@ -2,7 +2,13 @@
 from model.crawl_article import CrawlArticle
 from model.crawl_wallstreetcn_kuaixun import CrawlWallstreetcnKuaixun
 from Controller import Controller
-import json, requests, re
+import json, requests, re, logging
+
+logging.basicConfig(level=logging.INFO,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='logs/wallstreetcn_kuaixun.log',
+                filemode='w')
 
 class WallstreetcnkuaixunController(Controller):
     def __init__(self, topic="crawl_wallstreetcn_kuaixun"):
@@ -34,41 +40,44 @@ class WallstreetcnkuaixunController(Controller):
 
     def run(self):
         for msg in self.consumer:
-            data = json.loads(msg.value.decode('utf-8'))
-            dtype = data['dtype']
-            del data['dtype']
+            try:
+                data = json.loads(msg.value.decode('utf-8'))
+                dtype = data['dtype']
+                del data['dtype']
 
-            post_data = self.get_post_data(data)
-            with self.session_scope(self.sess) as session:
-                kuaixun = CrawlWallstreetcnKuaixun(**data)
+                post_data = self.get_post_data(data)
+                with self.session_scope(self.sess) as session:
+                    kuaixun = CrawlWallstreetcnKuaixun(**data)
 
-                print dtype
-                print kuaixun
-                if dtype == 'insert':
-                    session.add(kuaixun)
-                    result = requests.post(self.post_sn_url, post_data)
-                    print "insert", result.content
-                    res = result.json()
-                    if 'errno' in res and res['errno'] == 0:
+                    print dtype
+                    print kuaixun
+                    if dtype == 'insert':
+                        session.add(kuaixun)
+                        result = requests.post(self.post_sn_url, post_data)
+                        print "insert", result.content
+                        res = result.json()
+                        if 'errno' in res and res['errno'] == 0:
+                            session.query(CrawlWallstreetcnKuaixun).filter(
+                                CrawlWallstreetcnKuaixun.dateid == kuaixun.dateid
+                            ).update({'fx_id': res['data']['id']})
+                    elif dtype == 'update':
+                        query = session.query(CrawlWallstreetcnKuaixun.id, CrawlWallstreetcnKuaixun.fx_id).filter(
+                            CrawlWallstreetcnKuaixun.dateid == kuaixun.dateid
+                        ).one_or_none()
+
+                        if query:
+                            post_data['id'] = query[1]
+                            result = requests.post(self.post_sn_url, post_data)
+                            session.query(CrawlWallstreetcnKuaixun).filter(
+                                CrawlWallstreetcnKuaixun.id == query[0]
+                            ).update(data)
+                    elif dtype == 'delete':
+                        print "delete"
                         session.query(CrawlWallstreetcnKuaixun).filter(
                             CrawlWallstreetcnKuaixun.dateid == kuaixun.dateid
-                        ).update({'fx_id': res['data']['id']})
-                elif dtype == 'update':
-                    query = session.query(CrawlWallstreetcnKuaixun.id, CrawlWallstreetcnKuaixun.fx_id).filter(
-                        CrawlWallstreetcnKuaixun.dateid == kuaixun.dateid
-                    ).one_or_none()
-
-                    if query:
-                        post_data['id'] = query[1]
-                        result = requests.post(self.post_sn_url, post_data)
-                        session.query(CrawlWallstreetcnKuaixun).filter(
-                            CrawlWallstreetcnKuaixun.id == query[0]
-                        ).update(data)
-                elif dtype == 'delete':
-                    print "delete"
-                    session.query(CrawlWallstreetcnKuaixun).filter(
-                        CrawlWallstreetcnKuaixun.dateid == kuaixun.dateid
-                    ).delete()
+                        ).delete()
+            except Exception, e:
+                logging.error(e)
 
     def get_post_data(self, data):
         key_map = {

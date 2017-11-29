@@ -4,7 +4,13 @@ from model.crawl_fx678_economic_calendar import CrawlFx678EconomicCalendar
 from model.crawl_fx678_economic_event import CrawlFx678EconomicEvent
 from model.crawl_fx678_economic_holiday import CrawlFx678EconomicHoliday
 from Controller import Controller
-import json, requests, re
+import json, requests, re, logging
+
+logging.basicConfig(level=logging.INFO,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='logs/jin10_calendar.log',
+                filemode='w')
 
 class Fx678calendarController(Controller):
     def __init__(self, topic="crawl_fx678_calendar"):
@@ -36,16 +42,19 @@ class Fx678calendarController(Controller):
 
     def run(self):
         for msg in self.consumer:
-            data = json.loads(msg.value.decode('utf-8'))
-            dtype= data['dtype'] if "dtype" in data else "calendar"
+            try:
+                data = json.loads(msg.value.decode('utf-8'))
+                dtype= data['dtype'] if "dtype" in data else "calendar"
 
-            del data['dtype']
-            if dtype == 'calendar':
-                self.parse_calendar(data)
-            elif dtype == 'event':
-                self.parse_event(data)
-            elif dtype == 'holiday':
-                self.parse_holiday(data)
+                del data['dtype']
+                if dtype == 'calendar':
+                    self.parse_calendar(data)
+                elif dtype == 'event':
+                    self.parse_event(data)
+                elif dtype == 'holiday':
+                    self.parse_holiday(data)
+            except Exception, e:
+                logging.error(e)
 
     def parse_calendar(self, data):
         key_map = {

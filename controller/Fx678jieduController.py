@@ -2,7 +2,13 @@
 from model.crawl_article import CrawlArticle
 from model.crawl_fx678_economic_jiedu import CrawlFx678EconomicJiedu
 from Controller import Controller
-import json
+import json, requests, re, logging
+
+logging.basicConfig(level=logging.INFO,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='logs/fx678_jiedu.log',
+                filemode='w')
 
 class Fx678jieduController(Controller):
     def __init__(self, topic="crawl_fx678_calendar_jiedu"):

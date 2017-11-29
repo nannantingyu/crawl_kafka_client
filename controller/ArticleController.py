@@ -2,7 +2,13 @@
 from model.crawl_article import CrawlArticle
 from kafka import KafkaConsumer
 from Controller import Controller
-import json, re, requests
+import json, re, requests, logging
+
+logging.basicConfig(level=logging.INFO,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='logs/article.log',
+                filemode='w')
 
 class ArticleController(Controller):
     def __init__(self, topic="crawl_article"):
@@ -42,59 +48,59 @@ class ArticleController(Controller):
 
     def run(self):
         for msg in self.consumer:
-            data = json.loads(msg.value.decode('utf-8'))
-            dtype= data['dtype'] if "dtype" in data else "insert"
-            key = data['key'] if "key" in data else "source_id"
+            try:
+                data = json.loads(msg.value.decode('utf-8'))
+                dtype= data['dtype'] if "dtype" in data else "insert"
+                key = data['key'] if "key" in data else "source_id"
 
-            del data['dtype']
-            if "key" in data:
-                del data['key']
+                del data['dtype']
+                if "key" in data:
+                    del data['key']
 
-            article = CrawlArticle(**data)
+                article = CrawlArticle(**data)
 
-            print "\n\n", dtype, key, "\n\n"
+                with self.session_scope(self.sess) as session:
+                    if dtype == 'insert':
+                        query = session.query(CrawlArticle.id).filter(
+                            CrawlArticle.source_id == article.source_id
+                        ).one_or_none()
 
-            with self.session_scope(self.sess) as session:
-                if dtype == 'insert':
-                    query = session.query(CrawlArticle.id).filter(
-                        CrawlArticle.source_id == article.source_id
-                    ).one_or_none()
-
-                    if query is None:
-                        session.add(article)
-                        post_data = self.get_post_data(data)
-                        result = requests.post(self.post_sn_url, post_data)
-                        print "insert", result.content
-                        res = result.json()
-                        if 'errno' in res and res['errno'] == 0:
-                            session.query(CrawlArticle).filter(
-                                CrawlArticle.source_id == article.source_id
-                            ).update({'fx_id': res['data']['id']})
+                        if query is None:
+                            session.add(article)
+                            post_data = self.get_post_data(data)
+                            result = requests.post(self.post_sn_url, post_data)
+                            print "insert", result.content
+                            res = result.json()
+                            if 'errno' in res and res['errno'] == 0:
+                                session.query(CrawlArticle).filter(
+                                    CrawlArticle.source_id == article.source_id
+                                ).update({'fx_id': res['data']['id']})
+                        else:
+                            query = session.query(CrawlArticle.id, CrawlArticle.fx_id).filter(
+                                getattr(CrawlArticle, key) == getattr(article, key)
+                            ).one_or_none()
+                            if query:
+                                post_data = self.get_post_data(data, True)
+                                post_data['id'] = query[1]
+                                result = requests.post(self.post_sn_url, post_data)
+                                session.query(CrawlArticle).filter(
+                                    CrawlArticle.id == query[0]
+                                ).update(data)
                     else:
-                        query = session.query(CrawlArticle.id, CrawlArticle.fx_id).filter(
-                            getattr(CrawlArticle, key) == getattr(article, key)
-                        ).one_or_none()
-                        if query:
-                            post_data = self.get_post_data(data, True)
-                            post_data['id'] = query[1]
-                            result = requests.post(self.post_sn_url, post_data)
-                            session.query(CrawlArticle).filter(
-                                CrawlArticle.id == query[0]
-                            ).update(data)
-                else:
-                    if hasattr(CrawlArticle, key):
-                        query = session.query(CrawlArticle.id, CrawlArticle.fx_id).filter(
-                            getattr(CrawlArticle, key) == getattr(article, key)
-                        ).one_or_none()
+                        if hasattr(CrawlArticle, key):
+                            query = session.query(CrawlArticle.id, CrawlArticle.fx_id).filter(
+                                getattr(CrawlArticle, key) == getattr(article, key)
+                            ).one_or_none()
 
-                        print "-----------------", query, "\n"
-                        if query:
-                            post_data = self.get_post_data(data, True)
-                            post_data['id'] = query[1]
-                            result = requests.post(self.post_sn_url, post_data)
-                            session.query(CrawlArticle).filter(
-                                CrawlArticle.id == query[0]
-                            ).update(data)
+                            if query:
+                                post_data = self.get_post_data(data, True)
+                                post_data['id'] = query[1]
+                                result = requests.post(self.post_sn_url, post_data)
+                                session.query(CrawlArticle).filter(
+                                    CrawlArticle.id == query[0]
+                                ).update(data)
+            except Exception as e:
+                logging.error(e)
 
 
     def get_post_data(self, data, update=False):
@@ -127,5 +133,4 @@ class ArticleController(Controller):
         #         print "inininininininini\n\n\n", self.cat_map[group_id]
         #         post_data['group_id'] = self.cat_map[group_id]
 
-        print post_data
         return post_data

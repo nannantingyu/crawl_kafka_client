@@ -2,7 +2,13 @@
 from model.crawl_article import CrawlArticle
 from model.crawl_jin10_kuaixun import CrawlJin10Kuaixun
 from Controller import Controller
-import json, requests, re
+import json, requests, re, logging
+
+logging.basicConfig(level=logging.INFO,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='logs/jin10_kuaixun.log',
+                filemode='w')
 
 class Jin10kuaixunController(Controller):
     def __init__(self, topic="crawl_jin10_kuaixun"):
@@ -34,36 +40,39 @@ class Jin10kuaixunController(Controller):
 
     def run(self):
         for msg in self.consumer:
-            data = json.loads(msg.value.decode('utf-8'))
-            key = data['key']
-            del data['dtype']
-            del data['key']
+            try:
+                data = json.loads(msg.value.decode('utf-8'))
+                key = data['key']
+                del data['dtype']
+                del data['key']
 
-            with self.session_scope(self.sess) as session:
-                kuaixun = CrawlJin10Kuaixun(**data)
+                with self.session_scope(self.sess) as session:
+                    kuaixun = CrawlJin10Kuaixun(**data)
 
-                post_data = self.get_post_data(data)
-                query = session.query(CrawlJin10Kuaixun.id, CrawlJin10Kuaixun.fx_id).filter(
-                    getattr(CrawlJin10Kuaixun, key) == getattr(kuaixun, key)
-                ).one_or_none()
+                    post_data = self.get_post_data(data)
+                    query = session.query(CrawlJin10Kuaixun.id, CrawlJin10Kuaixun.fx_id).filter(
+                        getattr(CrawlJin10Kuaixun, key) == getattr(kuaixun, key)
+                    ).one_or_none()
 
-                if query is None:
-                    session.add(kuaixun)
-                    result = requests.post(self.post_sn_url, post_data)
-                    print "insert", result.content
-                    res = result.json()
-                    if 'errno' in res and res['errno'] == 0:
+                    if query is None:
+                        session.add(kuaixun)
+                        result = requests.post(self.post_sn_url, post_data)
+                        print "insert", result.content
+                        res = result.json()
+                        if 'errno' in res and res['errno'] == 0:
+                            session.query(CrawlJin10Kuaixun).filter(
+                                getattr(CrawlJin10Kuaixun, key) == getattr(kuaixun, key)
+                            ).update({'fx_id': res['data']['id']})
+                    else:
+                        post_data['id'] = query[1]
+                        result = requests.post(self.post_sn_url, post_data)
                         session.query(CrawlJin10Kuaixun).filter(
-                            getattr(CrawlJin10Kuaixun, key) == getattr(kuaixun, key)
-                        ).update({'fx_id': res['data']['id']})
-                else:
-                    post_data['id'] = query[1]
-                    result = requests.post(self.post_sn_url, post_data)
-                    session.query(CrawlJin10Kuaixun).filter(
-                        CrawlJin10Kuaixun.id == query[0]
-                    ).update(data)
+                            CrawlJin10Kuaixun.id == query[0]
+                        ).update(data)
 
-                print result.content
+                    print result.content
+            except Exception, e:
+                logging.error(e)
 
     def get_post_data(self, data):
         key_map = {
