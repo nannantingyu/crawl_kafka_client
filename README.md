@@ -18,7 +18,14 @@
             db_database: db_database    #数据库
         }
 
-3. 爬虫启动
+3. web端api地址
+
+        .env
+        {
+            web_api_address: "http://10.20.0.13:8360/api/content"
+        }
+
+4. 爬虫启动
 
         #财经日历
         python main.py -c Jin10calendar

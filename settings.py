@@ -17,3 +17,5 @@ kafka = {
     'host': environ.get("cafca_host"),
     'port': environ.get("cafca_port")
 }
+
+post_address = environ.get("web_api_address")
