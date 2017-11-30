@@ -25,6 +25,9 @@ if __name__ == '__main__':
     topic = opts.topic
 
     ctl = eval("%s.%s" % (controllerName, controllerName))
-    ctl_obj = ctl(topic)
+    if topic:
+        ctl_obj = ctl(topic)
+    else:
+        ctl_obj = ctl()
 
     ctl_obj.run()
