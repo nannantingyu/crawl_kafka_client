@@ -15,9 +15,7 @@ logging.basicConfig(level=logging.INFO,
 class Fx678calendarController(Controller):
     def __init__(self, topic="crawl_fx678_calendar"):
         super(Fx678calendarController, self).__init__(topic)
-        self.post_sn_url = 'http://127.0.0.1:8361/api/content'
         # self.post_sn_url = 'http://www.9dfx.com/api/content'
-        self.token = '9286168e06a110cd374caa0f67f08199'
 
         self.post_data = {
             'category': '财经日历',

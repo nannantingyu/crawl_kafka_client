@@ -28,5 +28,7 @@ class Controller(object):
         self.sess = sessionmaker(bind=engine)
         self.server = settings.kafka
         self.session_scope = session_scope
+        self.post_sn_url = 'http://10.20.0.13:8360/api/content'
+        self.token = '9286168e06a110cd374caa0f67f08199'
 
         self.consumer = KafkaConsumer(topic, bootstrap_servers=self.server['host'])

@@ -13,9 +13,7 @@ logging.basicConfig(level=logging.INFO,
 class ArticleController(Controller):
     def __init__(self, topic="crawl_article"):
         super(ArticleController, self).__init__(topic)
-        self.post_sn_url = 'http://127.0.0.1:8361/api/content'
         # self.post_sn_url = 'http://www.9dfx.com/api/content'
-        self.token = '9286168e06a110cd374caa0f67f08199'
 
         self.post_data = {
             'category': '市场参考',
